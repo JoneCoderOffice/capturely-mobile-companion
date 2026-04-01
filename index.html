@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Capturely Remote - Mobile Screen Share</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0f0f1a;
+      --accent: #C94040;
+      --text-primary: #eaeaef;
+      --text-secondary: #9a9ab0;
+    }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+    .container {
+      width: 90%;
+      max-width: 400px;
+      padding: 30px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .status {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 10px;
+      color: var(--accent);
+    }
+    .btn {
+      background: linear-gradient(135deg, #C94040 0%, #E86B5A 100%);
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 4px 14px rgba(201, 64, 64, 0.35);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="setup">
+      <h1>Capturely Remote</h1>
+      <p>Stream your tablet screen directly to the Capturely extension.</p>
+      <div id="connectionStatus" class="status">Connecting...</div>
+      <button id="btnConnect" class="btn hidden">Pair with Extension</button>
+      <button id="btnShare" class="btn hidden">Start Screen Share</button>
+    </div>
+    <div id="streaming" class="hidden">
+      <h1>Streaming Active</h1>
+      <p>Keep this tab open while recording from your computer.</p>
+      <button id="btnStop" class="btn">Stop Sharing</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
