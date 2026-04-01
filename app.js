@@ -1,7 +1,7 @@
 /**
  * Capturely Remote - Mobile Peer logic
  * Connects to the desktop extension via PeerJS and streams the mobile screen.
- * v1.1 - Added diagnostic logging and explicit signaling server forcing.
+ * v1.2 - Added expanded STUN/ICE config and detailed connection troubleshooting.
  */
 
 (function() {
@@ -21,19 +21,22 @@
   let localStream = null;
   let connectionRetries = 0;
   const MAX_RETRIES = 5;
-  const CONNECT_TIMEOUT_MS = 15000;
+  const CONNECT_TIMEOUT_MS = 20000; // Increased timeout for NAT discovery
 
   function log(msg, error = false) {
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const div = document.createElement('div');
-    div.style.color = error ? '#ff7777' : '#aaa';
+    if (error) div.style.color = '#ff7777';
+    else if (msg.includes('ICE')) div.style.color = '#77aaff'; // Highlight ICE events
+    else div.style.color = '#aaa';
+    
     div.textContent = `[${time}] ${msg}`;
     logConsole.appendChild(div);
     logConsole.scrollTop = logConsole.scrollHeight;
     console.log(`[Capturely:Mobile] ${msg}`);
   }
 
-  log('Application initialized v1.1');
+  log('Application initialized v1.2');
 
   // 1. Get Desktop Peer ID from URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -54,18 +57,25 @@
       peer.destroy();
     }
 
-    // Explicitly set the PeerJS cloud server to ensure both sides are on the same signaling instance
+    // Explicitly set the PeerJS cloud server
     peer = new Peer(undefined, {
       host: '0.peerjs.com',
       secure: true,
       port: 443,
+      path: '/',
+      pingInterval: 5000,
       debug: 2,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-        ]
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'stun:stun.voipstunt.com:3478' },
+          // --- Add TURN credentials here if needed ---
+          // { urls: "turn:your-turn-server.com:3478", username: "user", credential: "password" }
+        ],
+        iceTransportPolicy: 'all',
       }
     });
 
@@ -77,21 +87,27 @@
     });
 
     peer.on('error', (err) => {
-      log(`Peer error: ${err.type} - ${err.message}`, true);
+      let msg = err.type;
+      if (err.type === 'peer-unavailable') msg = 'Desktop not found. Ensure extension is open.';
+      if (err.type === 'network') msg = 'Network error: Check firewall.';
+      if (err.type === 'webrtc') msg = 'WebRTC error: NAT traversal failed.';
 
-      if (err.type === 'peer-unavailable') {
-        statusDisplay.textContent = 'Desktop not found.';
-        if (connectionRetries < MAX_RETRIES) {
-          connectionRetries++;
-          log(`Retry ${connectionRetries}/${MAX_RETRIES} in 3s...`);
-          setTimeout(() => initPeer(), 3000);
-        }
-      } else if (err.type === 'network') {
-        statusDisplay.textContent = 'Network error.';
-      } else {
-        statusDisplay.textContent = 'Error: ' + err.type;
-      }
+      log(`Peer error: ${msg}`, true);
+      statusDisplay.textContent = msg;
       statusDisplay.style.color = '#ff4444';
+
+      if (err.type === 'peer-unavailable' && connectionRetries < MAX_RETRIES) {
+        connectionRetries++;
+        log(`Retry ${connectionRetries}/${MAX_RETRIES} in 3s...`);
+        setTimeout(() => initPeer(), 3000);
+      }
+    });
+
+    peer.on('disconnected', () => {
+      log('Disconnected from signaling server.', true);
+      if (peer && !peer.destroyed && peer.disconnected) {
+        peer.reconnect();
+      }
     });
   }
 
@@ -100,28 +116,33 @@
 
     const connectTimer = setTimeout(() => {
       if (!dataConn || !dataConn.open) {
-        log('Data connection timed out.', true);
+        log('Data connection timed out. Handshake missing.', true);
+        log('TIP: Try a different network or check if desktop is on same WiFi.', false);
         if (connectionRetries < MAX_RETRIES) {
           connectionRetries++;
-          setTimeout(() => connectToDesktop(), 1000);
+          setTimeout(() => connectToDesktop(), 2000);
         }
       }
     }, CONNECT_TIMEOUT_MS);
 
-    // Reliable: true is important for the PAIRED handshake
     dataConn = peer.connect(desktopPeerId, { reliable: true });
+
+    // Diagnostic: Track ICE candidates
+    dataConn.on('iceStateChanged', (state) => {
+      log(`ICE State: ${state}`);
+    });
 
     dataConn.on('open', () => {
       clearTimeout(connectTimer);
-      log('Data channel OPEN. Waiting for desktop ACK...');
+      log('Data channel OPEN. Waiting for ACK...');
       statusDisplay.textContent = 'Handshaking...';
       statusDisplay.style.color = '#30d060';
     });
 
     dataConn.on('data', (data) => {
-      log(`Data received: ${JSON.stringify(data)}`);
+      log(`Data: ${JSON.stringify(data)}`);
       if (data && data.type === 'PAIRED') {
-        log('Desktop paired successfully!');
+        log('Desktop paired!');
         statusDisplay.textContent = 'Ready to stream';
         statusDisplay.style.color = '#30d060';
         btnShare.classList.remove('hidden');
@@ -129,33 +150,22 @@
     });
     
     dataConn.on('close', () => {
-      log('Data connection closed.', true);
-      statusDisplay.textContent = 'Connection closed.';
-      statusDisplay.style.color = '#ff4444';
+      log('Connection closed.', true);
+      statusDisplay.textContent = 'Closed.';
       btnShare.classList.add('hidden');
-    });
-
-    peer.on('disconnected', () => {
-      console.warn('[Capturely:Mobile] Disconnected from signaling server.');
-      log('Disconnected from signaling. Attempting reconnect...', true);
-      statusDisplay.textContent = 'Disconnected. Reconnecting...';
-      statusDisplay.style.color = '#f0a030';
-      if (peer && !peer.destroyed && peer.disconnected) {
-        peer.reconnect();
-      }
     });
   }
 
   // 3. Handle Screen Sharing
   btnShare.addEventListener('click', async () => {
     try {
-      log('Requesting screen share permission...');
+      log('Requesting screen share...');
       localStream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: "always" },
         audio: { echoCancellation: true, noiseSuppression: true }
       });
 
-      log('Screen stream obtained.');
+      log('Stream obtained. Calling desktop...');
       mediaConnection = peer.call(desktopPeerId, localStream);
 
       mediaConnection.on('error', (err) => log(`Media error: ${err.message}`, true));
@@ -164,7 +174,7 @@
       streamingView.classList.remove('hidden');
 
       localStream.getVideoTracks()[0].onended = () => {
-        log('Screen stream ended by OS.');
+        log('Stream ended by system.');
         stopStreaming();
       };
 
@@ -177,7 +187,7 @@
   btnStop.addEventListener('click', stopStreaming);
 
   function stopStreaming() {
-    log('Stopping stream.');
+    log('Stopping.');
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
       localStream = null;
