@@ -135,8 +135,14 @@
       btnShare.classList.add('hidden');
     });
 
-    dataConn.on('error', (err) => {
-      log(`Connection error: ${err}`, true);
+    peer.on('disconnected', () => {
+      console.warn('[Capturely:Mobile] Disconnected from signaling server.');
+      log('Disconnected from signaling. Attempting reconnect...', true);
+      statusDisplay.textContent = 'Disconnected. Reconnecting...';
+      statusDisplay.style.color = '#f0a030';
+      if (peer && !peer.destroyed && peer.disconnected) {
+        peer.reconnect();
+      }
     });
   }
 
