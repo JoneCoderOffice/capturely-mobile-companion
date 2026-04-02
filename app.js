@@ -143,6 +143,8 @@
 
     dataConn = peer.connect(desktopPeerId, { reliable: true });
 
+    log('Connection testing...');
+
     dataConn.on('open', () => {
       clearTimeout(connectTimer);
       connectionRetries = 0; // Reset counter on success
