@@ -85,17 +85,17 @@
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
           { urls: 'stun:stun.cloudflare.com:3478' },
-          { urls: 'stun:stun.voipstunt.com:3478' },
-          { urls: 'stun:stun.betamax.com:3478' },
-          { urls: 'stun:stun.ekiga.net:3478' },
-          { urls: 'stun:stun.ideasip.com:3478' },
-          { urls: 'stun:stun.schlund.de:3478' },
-          { urls: 'stun:stun.voiparound.com:3478' },
-          { urls: 'stun:stun.voipbuster.com:3478' },
-          { urls: 'stun:stun.voxgratia.org:3478' },
+          // --- Public TURN relay (OpenRelayProject) ---
+          {
+            urls: [
+              'turn:openrelay.metered.ca:80',
+              'turn:openrelay.metered.ca:443',
+              'turn:openrelay.metered.ca:443?transport=tcp'
+            ],
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ],
         iceTransportPolicy: 'all',
       }
@@ -162,8 +162,18 @@
         log(`ICE Connection State: ${pc.iceConnectionState}`);
         pc.oniceconnectionstatechange = () => {
           log(`ICE Connection State: ${pc.iceConnectionState}`);
+          if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            const stats = pc.getStats().then(s => {
+              s.forEach(report => {
+                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                  const relayUsed = report.remoteCandidateType === 'relay' || report.localCandidateType === 'relay';
+                  log(`Connection Type: ${relayUsed ? 'Relay (TURN)' : 'Direct (P2P)'}`);
+                }
+              });
+            });
+          }
           if (pc.iceConnectionState === 'failed') {
-            log('ICE traversal failed. Possibly Symmetric NAT issue.', true);
+            log('ICE traversal failed. Please check network restrictions.', true);
           }
         };
       }
