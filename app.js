@@ -28,11 +28,16 @@
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const div = document.createElement('div');
     if (error) div.style.color = '#ff7777';
-    else if (msg.includes('ICE')) div.style.color = '#77aaff';
-    else if (msg.includes('Heartbeat')) div.style.color = '#77ffaa';
+    else if (typeof msg === 'string' && msg.includes('ICE')) div.style.color = '#77aaff';
+    else if (typeof msg === 'string' && msg.includes('Heartbeat')) div.style.color = '#77ffaa';
     else div.style.color = '#aaa';
     
-    div.textContent = `[${time}] ${msg}`;
+    const displayMsg = (typeof msg === 'object') ? JSON.stringify(msg, (key, value) => {
+      if (key === 'peerConnection' || key === 'provider') return '[Circular]';
+      return value;
+    }, 2) : String(msg);
+
+    div.textContent = `[${time}] ${displayMsg}`;
     logConsole.appendChild(div);
     logConsole.scrollTop = logConsole.scrollHeight;
     console.log(`[Capturely:Mobile] ${msg}`);
@@ -142,8 +147,7 @@
     }, CONNECT_TIMEOUT_MS);
 
     dataConn = peer.connect(desktopPeerId, { reliable: true });
-
-    log(dataConn);
+    log(`Connecting to: ${desktopPeerId}`);
 
     dataConn.on('open', () => {
       clearTimeout(connectTimer);
