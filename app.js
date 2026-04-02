@@ -143,7 +143,7 @@
 
     dataConn = peer.connect(desktopPeerId, { reliable: true });
 
-    log('Connection testing...');
+    log(dataConn);
 
     dataConn.on('open', () => {
       clearTimeout(connectTimer);
