@@ -22,7 +22,7 @@
   let connectionRetries = 0;
   let heartbeatInterval = null;
   const MAX_RETRIES = 5;
-  const CONNECT_TIMEOUT_MS = 20000;
+  const CONNECT_TIMEOUT_MS = 25000; // Increased to 25s for slow NAT traversal
 
   function log(msg, error = false) {
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -80,7 +80,17 @@
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
           { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'stun:stun.voipstunt.com:3478' },
+          { urls: 'stun:stun.betamax.com:3478' },
+          { urls: 'stun:stun.ekiga.net:3478' },
+          { urls: 'stun:stun.ideasip.com:3478' },
+          { urls: 'stun:stun.schlund.de:3478' },
+          { urls: 'stun:stun.voiparound.com:3478' },
+          { urls: 'stun:stun.voipbuster.com:3478' },
+          { urls: 'stun:stun.voxgratia.org:3478' },
         ],
         iceTransportPolicy: 'all',
       }
@@ -135,9 +145,22 @@
 
     dataConn.on('open', () => {
       clearTimeout(connectTimer);
+      connectionRetries = 0; // Reset counter on success
       log('P2P channel OPEN. Waiting for ACK...');
       statusDisplay.textContent = 'Handshaking...';
       statusDisplay.style.color = '#30d060';
+      
+      // Monitor ICE connection state changes for diagnostic log
+      if (dataConn.peerConnection) {
+        const pc = dataConn.peerConnection;
+        log(`ICE Connection State: ${pc.iceConnectionState}`);
+        pc.oniceconnectionstatechange = () => {
+          log(`ICE Connection State: ${pc.iceConnectionState}`);
+          if (pc.iceConnectionState === 'failed') {
+            log('ICE traversal failed. Possibly Symmetric NAT issue.', true);
+          }
+        };
+      }
       
       // Start heartbeat
       startHeartbeat();
