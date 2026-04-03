@@ -189,6 +189,10 @@
         statusDisplay.style.color = '#30d060';
         btnShare.classList.remove('hidden');
       }
+      if (data && data.type === 'STOP_STREAMING') {
+        log('Stop signal received from desktop.');
+        stopStreaming();
+      }
       if (data && data.type === 'PONG') {
         // Quiet heartbeat log
         console.log('[Capturely:Mobile] Pong received');
@@ -200,6 +204,7 @@
       statusDisplay.textContent = 'Closed.';
       btnShare.classList.add('hidden');
       stopHeartbeat();
+      stopStreaming(); // Ensure tracks are stopped if connection drops
     });
   }
 
